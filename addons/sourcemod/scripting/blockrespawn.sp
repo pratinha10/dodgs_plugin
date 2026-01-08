@@ -4,13 +4,16 @@
 * Description:
 *   Prevents immediately re-spawning after changing player class within a spawn area (always blocks).
 *
-* Version 1.0
+* Version 2.0 - Updated for SourceMod 1.11+
 * Changelog & more info at https://github.com/pratinha10/dodgs_plugin
 */
 
+#pragma semicolon 1
+#pragma newdecls required
+
 // ====[ CONSTANTS ]======================================================================
 #define PLUGIN_NAME    "DoD:S Block Class Respawn"
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "2.0"
 
 #define CLASS_INIT     0
 #define MAX_CLASS      6
@@ -26,13 +29,13 @@ enum
 	TEAM_ALLIES,
 	TEAM_AXIS,
 	TEAM_SIZE
-};
+}
 
 // ====[ VARIABLES ]======================================================================
-static const String:block_cmds[][] = { "cls_random", "joinclass" },
-	String:allies_cmds[][]  = { "cls_garand", "cls_tommy", "cls_bar",  "cls_spring", "cls_30cal", "cls_bazooka"  },
-	String:axis_cmds[][]    = { "cls_k98",    "cls_mp40",  "cls_mp44", "cls_k98s",   "cls_mg42",  "cls_pschreck" },
-	String:allies_cvars[][] =
+static const char block_cmds[][] = { "cls_random", "joinclass" };
+static const char allies_cmds[][] = { "cls_garand", "cls_tommy", "cls_bar", "cls_spring", "cls_30cal", "cls_bazooka" };
+static const char axis_cmds[][] = { "cls_k98", "cls_mp40", "cls_mp44", "cls_k98s", "cls_mg42", "cls_pschreck" };
+static const char allies_cvars[][] =
 {
 	"mp_limit_allies_rifleman",
 	"mp_limit_allies_assault",
@@ -40,8 +43,8 @@ static const String:block_cmds[][] = { "cls_random", "joinclass" },
 	"mp_limit_allies_sniper",
 	"mp_limit_allies_mg",
 	"mp_limit_allies_rocket"
-},
-	String:axis_cvars[][] =
+};
+static const char axis_cvars[][] =
 {
 	"mp_limit_axis_rifleman",
 	"mp_limit_axis_assault",
@@ -51,10 +54,11 @@ static const String:block_cmds[][] = { "cls_random", "joinclass" },
 	"mp_limit_axis_rocket"
 };
 
-new	classlimit[TEAM_SIZE][MAX_CLASS], Handle:blockchange_enabled = INVALID_HANDLE;
+int classlimit[TEAM_SIZE][MAX_CLASS];
+ConVar blockchange_enabled;
 
 // ====[ PLUGIN ]=========================================================================
-public Plugin:myinfo =
+public Plugin myinfo =
 {
 	name        = PLUGIN_NAME,
 	author      = "pratinha",
@@ -68,44 +72,60 @@ public Plugin:myinfo =
  *
  * When the plugin starts up.
  * --------------------------------------------------------------------------------------- */
-public OnPluginStart()
+public void OnPluginStart()
 {
 	CreateConVar("dod_blockrespawn_version", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	blockchange_enabled = CreateConVar("dod_blockrespawn", "1", "Enable/disable blocking player respawning after changing class (0 = disabled, 1 = enabled)", FCVAR_PLUGIN, true, 0.0, true, 1.0);
 
-	for (new i; i < sizeof(block_cmds); i++)
+	for (int i = 0; i < sizeof(block_cmds); i++)
 	{
 		// Using AddCommandListener to intercept existing commands
 		AddCommandListener(OtherClass, block_cmds[i]);
 	}
 
 	// Get all commands and classlimit ConVars for both teams
-	for (new i; i < MAX_CLASS; i++)
+	for (int i = 0; i < MAX_CLASS; i++)
 	{
 		AddCommandListener(OnAlliesClass, allies_cmds[i]);
-		AddCommandListener(OnAxisClass,   axis_cmds[i]);
+		AddCommandListener(OnAxisClass, axis_cmds[i]);
 
 		// Initialize team-specified classlimits
-		classlimit[TEAM_ALLIES][i] = GetConVarInt(FindConVar(allies_cvars[i]));
-		classlimit[TEAM_AXIS][i]   = GetConVarInt(FindConVar(axis_cvars[i]));
-
-		// Hook any changes for classlimit cvars
-		HookConVarChange(FindConVar(allies_cvars[i]), UpdateClassLimits);
-		HookConVarChange(FindConVar(axis_cvars[i]),   UpdateClassLimits);
+		ConVar alliesCvar = FindConVar(allies_cvars[i]);
+		ConVar axisCvar = FindConVar(axis_cvars[i]);
+		
+		if (alliesCvar != null)
+		{
+			classlimit[TEAM_ALLIES][i] = alliesCvar.IntValue;
+			alliesCvar.AddChangeHook(UpdateClassLimits);
+		}
+		
+		if (axisCvar != null)
+		{
+			classlimit[TEAM_AXIS][i] = axisCvar.IntValue;
+			axisCvar.AddChangeHook(UpdateClassLimits);
+		}
 	}
+	
+	AutoExecConfig(true, "plugin.dod_blockrespawn");
 }
 
 /* UpdateClasslimits()
  *
  * Called when value of classlimit convar is changed.
  * --------------------------------------------------------------------------------------- */
-public UpdateClassLimits(Handle:convar, const String:oldValue[], const String:newValue[])
+public void UpdateClassLimits(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	for (new i; i < MAX_CLASS; i++)
+	for (int i = 0; i < MAX_CLASS; i++)
 	{
 		// When classlimit value is changed (for any team/any class), just re-init variables again
-		classlimit[TEAM_ALLIES][i] = GetConVarInt(FindConVar(allies_cvars[i]));
-		classlimit[TEAM_AXIS][i]   = GetConVarInt(FindConVar(axis_cvars[i]));
+		ConVar alliesCvar = FindConVar(allies_cvars[i]);
+		ConVar axisCvar = FindConVar(axis_cvars[i]);
+		
+		if (alliesCvar != null)
+			classlimit[TEAM_ALLIES][i] = alliesCvar.IntValue;
+			
+		if (axisCvar != null)
+			classlimit[TEAM_AXIS][i] = axisCvar.IntValue;
 	}
 }
 
@@ -113,18 +133,18 @@ public UpdateClassLimits(Handle:convar, const String:oldValue[], const String:ne
  *
  * Called when a player has executed a join class command for Allies team.
  * --------------------------------------------------------------------------------------- */
-public Action:OnAlliesClass(client, const String:command[], argc)
+public Action OnAlliesClass(int client, const char[] command, int argc)
 {
-	new team = GetClientTeam(client);
+	int team = GetClientTeam(client);
 
 	// Make sure plugin is enabled and player is alive
-	if (IsPlayerAlive(client) && GetConVarBool(blockchange_enabled) && team == TEAM_ALLIES)
+	if (IsPlayerAlive(client) && blockchange_enabled.BoolValue && team == TEAM_ALLIES)
 	{
-		new class = CLASS_INIT;
-		new cvar  = CLASS_INIT;
+		int class = CLASS_INIT;
+		int cvar = CLASS_INIT;
 
 		// Loop through available allies class commands
-		for (new i; i < sizeof(allies_cmds); i++)
+		for (int i = 0; i < sizeof(allies_cmds); i++)
 		{
 			if (StrEqual(command, allies_cmds[i]))
 			{
@@ -150,17 +170,17 @@ public Action:OnAlliesClass(client, const String:command[], argc)
  *
  * Called when a player has executed a join class command for Axis team.
  * --------------------------------------------------------------------------------------- */
-public Action:OnAxisClass(client, const String:command[], argc)
+public Action OnAxisClass(int client, const char[] command, int argc)
 {
-	new team = GetClientTeam(client);
+	int team = GetClientTeam(client);
 
-	if (IsPlayerAlive(client) && GetConVarBool(blockchange_enabled) && team == TEAM_AXIS)
+	if (IsPlayerAlive(client) && blockchange_enabled.BoolValue && team == TEAM_AXIS)
 	{
 		// Initialize class and cvar numbers
-		new class = CLASS_INIT;
-		new cvar  = CLASS_INIT;
+		int class = CLASS_INIT;
+		int cvar = CLASS_INIT;
 
-		for (new i; i < sizeof(axis_cmds); i++)
+		for (int i = 0; i < sizeof(axis_cmds); i++)
 		{
 			// Now assign a class and a convar numbers as same than command
 			if (StrEqual(command, axis_cmds[i]))
@@ -186,29 +206,30 @@ public Action:OnAxisClass(client, const String:command[], argc)
  *
  * Called when a player has executed a random or other command to change class.
  * --------------------------------------------------------------------------------------- */
-public Action:OtherClass(client, const String:command[], argc)
+public Action OtherClass(int client, const char[] command, int argc)
 {
 	// Block "joinclass/cls_random" commands if plugin is enabled
-	return GetConVarBool(blockchange_enabled) ? Plugin_Handled : Plugin_Continue;
+	return blockchange_enabled.BoolValue ? Plugin_Handled : Plugin_Continue;
 }
 
 /* IsClassAvailable()
  *
  * Checks whether or not desired class is available via limit cvars.
  * --------------------------------------------------------------------------------------- */
-bool:IsClassAvailable(client, team, desiredclass, cvarnumber)
+bool IsClassAvailable(int client, int team, int desiredclass, int cvarnumber)
 {
 	// Initialize amount of classes
-	new class = CLASS_INIT;
+	int class = CLASS_INIT;
 
 	// Lets loop through all clients from same team
-	for (new i = 1; i <= MaxClients; i++)
+	for (int i = 1; i <= MaxClients; i++)
 	{
 		// Make sure all clients is in game!
 		if (IsClientInGame(i) && GetClientTeam(i) == team)
 		{
 			// If any classes which teammates are playing right now and matches with desired, increase amount of classes on every match
-			if (m_iDesiredPlayerClass(i) == desiredclass) class++;
+			if (m_iDesiredPlayerClass(i) == desiredclass)
+				class++;
 		}
 	}
 
@@ -227,19 +248,19 @@ bool:IsClassAvailable(client, team, desiredclass, cvarnumber)
  *
  * Prints default TextMsg usermessage with phrase.
  * --------------------------------------------------------------------------------------- */
-PrintUserMessage(client, desiredclass, const String:command[])
+void PrintUserMessage(int client, int desiredclass, const char[] command)
 {
 	// Don't print message if player selected desired class more than once
 	if (m_iDesiredPlayerClass(client) != desiredclass)
 	{
 		// Start a simpler TextMsg usermessage for one client
-		new Handle:TextMsg = StartMessageOne("TextMsg", client);
+		Handle TextMsg = StartMessageOne("TextMsg", client);
 
 		// Just to be safer
-		if (TextMsg != INVALID_HANDLE)
+		if (TextMsg != null)
 		{
 			// Write into a bitbuffer the stock 'You will respawn as' phrase
-			decl String:buffer[128];
+			char buffer[128];
 			Format(buffer, sizeof(buffer), "\x03#Game_respawn_as");
 			BfWriteString(TextMsg, buffer);
 
