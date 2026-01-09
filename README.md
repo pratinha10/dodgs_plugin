@@ -23,7 +23,7 @@ Designed to stop round abuse and enforce fair play in competitive matches.
 - ✅ Shows "You will respawn as [class]" message to players
 
 
-### sprintblock
+### 💽 sprintblock
 Blocks or restricts sprint usage to align movement mechanics with competitive or custom rule sets.
 
 The plugin uses `SDKHook_PreThink` to monitor player inputs every server tick (66 tick servers). It:
@@ -38,7 +38,7 @@ The plugin uses `SDKHook_PreThink` to monitor player inputs every server tick (6
 - **Network**: No additional network traffic
 - **Optimized**: Uses native Source Engine functions for maximum efficiency
 
-### dodsg_ftb
+### 💽 dodsg_ftb (Fade to Black)
 A modern SourceMod plugin for Day of Defeat: Source that implements a realistic "Fade to Black" effect when players die.
 
 - ✅ Instant black screen fade on death
