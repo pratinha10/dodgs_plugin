@@ -1,20 +1,16 @@
-/**
-Originally developed by <eVa>Dog
-Modernized and fixed by pratinha
+//
+// SourceMod Script
+//
+// Originally developed by <eVa>Dog
+// Modernized and fixed - 2026
+//
+// DESCRIPTION:
+// For Day of Defeat: Source only
+// This plugin implements the "Fade to Black" effect when players die
+//
+// CHANGELOG:
+// - 2026.01 Version 2.0.0 - Complete modernization and bug fixes
 
-DESCRIPTION:
-For Day of Defeat: Source only
-This plugin implements the "Fade to Black" effect when players die
-
-CONSOLE COMMANDS
-dodsg_ftb_enabled 0      // Disables plugin
-dodsg_ftb_speed 0.5      // Fade Speed (0.1 = very fast, 2.0 = slow)
-dodsg_ftb_delay 3.0      // How long stays black
-dodsg_ftb_red 0          // Red Color
-dodsg_ftb_green 0        // Green Color
-dodsg_ftb_blue 0         // Blue Color
-dodsg_ftb_alpha 255      // Opacity
-*/
 #include <sourcemod>
 #include <sdktools>
 
@@ -119,11 +115,11 @@ void ApplyScreenFade(int client, int red, int green, int blue, int alpha, float 
 	if (!IsValidClient(client))
 		return;
 	
-	int duration = RoundToNearest(speed * 1000.0); // Fade transition speed
+	int duration = RoundToNearest(speed * 1000.0); // Fade transition speed (how fast it goes black)
 	int holdTime = RoundToNearest(delay * 1000.0); // How long it stays black
 	int fadeFlags = FADE_OUT | FADE_STAYOUT;
 	
-	// Use UserMessage instead of StartMessageOne (more modern)
+	// Apply the fade to black
 	Handle userMessage = StartMessageOne("Fade", client, USERMSG_RELIABLE);
 	
 	if (userMessage != INVALID_HANDLE)
@@ -137,6 +133,45 @@ void ApplyScreenFade(int client, int red, int green, int blue, int alpha, float 
 		BfWriteByte(userMessage, alpha);
 		EndMessage();
 	}
+	
+	// Create timer to fade back to normal after delay
+	DataPack data = new DataPack();
+	data.WriteCell(GetClientUserId(client));
+	data.WriteCell(duration);
+	CreateTimer(delay, Timer_FadeIn, data);
+}
+
+public Action Timer_FadeIn(Handle timer, DataPack data)
+{
+	data.Reset();
+	int userId = data.ReadCell();
+	int duration = data.ReadCell();
+	delete data;
+	
+	int client = GetClientOfUserId(userId);
+	
+	// Check if client is still valid
+	if (!IsValidClient(client))
+		return Plugin_Stop;
+	
+	// Fade back to normal (transparent)
+	int fadeFlags = FADE_IN | FADE_PURGE;
+	
+	Handle userMessage = StartMessageOne("Fade", client, USERMSG_RELIABLE);
+	
+	if (userMessage != INVALID_HANDLE)
+	{
+		BfWriteShort(userMessage, duration);
+		BfWriteShort(userMessage, 0);
+		BfWriteShort(userMessage, fadeFlags);
+		BfWriteByte(userMessage, 0);
+		BfWriteByte(userMessage, 0);
+		BfWriteByte(userMessage, 0);
+		BfWriteByte(userMessage, 0);
+		EndMessage();
+	}
+	
+	return Plugin_Stop;
 }
 
 // Helper function to validate clients
