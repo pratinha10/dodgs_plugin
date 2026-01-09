@@ -17,7 +17,6 @@ A small collection of **SourceMod plugins** developed for the **DODS Global** co
 Prevents players from forcing a respawn by switching teams/class during an active round.  
 Designed to stop round abuse and enforce fair play in competitive matches.
 
-**Technical Details**
 The plugin uses `SDKHook_PreThink` to monitor player inputs every server tick (66 tick servers). It:
 
 1. **Tracks button press order**: Detects whether Sprint or Forward was pressed first
