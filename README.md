@@ -42,9 +42,9 @@ The plugin uses `SDKHook_PreThink` to monitor player inputs every server tick (6
 
 ## Requirements
 
-- Day of Defeat: Source Server
-- SourceMod 1.11 or newer  
-- Metamod:Source
+- Day of Defeat: Source Dedicated Server
+- [SourceMod](https://www.sourcemod.net/) 1.11 or newer
+- [Metamod:Source](https://www.sourcemm.net/)
 
 ---
 
@@ -64,5 +64,6 @@ MIT License
 
 ## Community
 
-Developed for the **DODS Global** community.  
+Developed for the [**DODS Global**](https://dodsglobal.com/league) community.
+Feel free to join them on [discord](https://discord.com/invite/B8z3vrYxHP).
 Issues and pull requests are welcome.
