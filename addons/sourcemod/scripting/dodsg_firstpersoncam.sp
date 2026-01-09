@@ -15,7 +15,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define DELAY_TIME 4.8
+#define DELAY_TIME 5
 #define OBS_MODE_IN_EYE 4
 #define OBS_MODE_CHASE 5
 #define OBS_MODE_ROAMING 6
