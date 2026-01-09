@@ -13,7 +13,7 @@ A small collection of **SourceMod plugins** developed for the **DODS Global** co
 
 ## Plugins
 
-### blockrespawnswitch
+### 💽 blockrespawnswitch
 Prevents players from forcing a respawn by switching teams/class during an active round.  
 Designed to stop round abuse and enforce fair play in competitive matches.
 
