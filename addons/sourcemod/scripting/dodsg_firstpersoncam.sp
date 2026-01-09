@@ -5,7 +5,7 @@
 *   Forces first person camera when observing teammates after death
 *
 * Version 1.0.1
-* Changelog & more info at https://github.com/pratinha10/dodgs_plugin
+* Changelog & more info at https://github.com/pratinha10/dodsg_plugins
 */
 
 #include <sourcemod>
@@ -15,7 +15,7 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#define DELAY_TIME 5
+#define DELAY_TIME 5.0
 #define OBS_MODE_IN_EYE 4
 #define OBS_MODE_CHASE 5
 #define OBS_MODE_ROAMING 6
@@ -36,8 +36,8 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
     int victim = GetClientOfUserId(event.GetInt("userid"));
     
     if (victim > 0 && IsClientInGame(victim)) {
-        // Fixed 4.8 seconds delay before forcing first person camera
-        CreateTimer(DELAY_TIME, Timer_SetFirstPerson, GetClientUserId(victim), TIMER_FLAG_NO_MAPCHANGE);
+        // Fixed 5 seconds delay before forcing first person camera
+        CreateTimer(DELAY_TIME, Timer_SetFirstPerson, GetClientUserId(victim));
     }
     
     return Plugin_Continue;
