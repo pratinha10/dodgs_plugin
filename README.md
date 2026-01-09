@@ -22,6 +22,8 @@ Designed to stop round abuse and enforce fair play in competitive matches.
 - ✅ Respects server class limits (mp_limit_* cvars)
 - ✅ Shows "You will respawn as [class]" message to players
 
+**Recommended Server Configuration**
+Add `dod_freezecam 0` to your `server.cfg` to disable the default killcam.
 
 ### 💽 sprintblock
 Blocks or restricts sprint usage to align movement mechanics with competitive or custom rule sets.
