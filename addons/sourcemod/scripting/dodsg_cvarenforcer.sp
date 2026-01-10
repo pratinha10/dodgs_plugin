@@ -15,6 +15,8 @@ enum struct CvarData
     char name[MAX_PATH_LENGTH];
     char immunity[64];
     char value[MAX_PATH_LENGTH];
+    char minValue[MAX_PATH_LENGTH];
+    char maxValue[MAX_PATH_LENGTH];
     int mode;
     int punishment;
     int banTime;
@@ -31,8 +33,8 @@ ConVar g_cvMaxWarnings;
 
 public Plugin myinfo =
 {
-    name = "[DoD:S] Client ConVar Checker",
-    author = "Kento, Modernized by pratinha",
+    name = "DoD:S ConVar Enforcer",
+    author = "pratinha",
     version = PLUGIN_VERSION,
     description = "Check and enforce client console variable rules",
     url = "https://github.com/pratinha10/dodsg_plugins"
@@ -55,9 +57,6 @@ public void OnPluginStart()
     
     // Auto-execute config
     AutoExecConfig(true, "dodsg_cvar_checker");
-    
-    // Load translations
-    LoadTranslations("dodsg.cvar_checker.phrases.txt");
     
     // Initialize ArrayList
     g_CvarList = new ArrayList(sizeof(CvarData));
@@ -123,6 +122,8 @@ void LoadConfiguration()
             kv.GetSectionName(data.name, sizeof(CvarData::name));
             kv.GetString("immunity", data.immunity, sizeof(CvarData::immunity), "");
             kv.GetString("value", data.value, sizeof(CvarData::value), "");
+            kv.GetString("min", data.minValue, sizeof(CvarData::minValue), "");
+            kv.GetString("max", data.maxValue, sizeof(CvarData::maxValue), "");
             data.mode = kv.GetNum("mode", 0);
             data.punishment = kv.GetNum("punishment", 1);
             data.banTime = kv.GetNum("bantime", 0);
@@ -195,10 +196,48 @@ public void OnCvarQueried(QueryCookie cookie, int client, ConVarQueryResult resu
     // Check if value is incorrect
     bool isViolation = false;
     
-    if (data.mode == 0) // Must be equal
-        isViolation = !StrEqual(cvarValue, data.value);
-    else if (data.mode == 1) // Must be different
-        isViolation = StrEqual(cvarValue, data.value);
+    switch (data.mode)
+    {
+        case 0: // Must be equal
+        {
+            isViolation = !StrEqual(cvarValue, data.value);
+        }
+        case 1: // Must be different
+        {
+            isViolation = StrEqual(cvarValue, data.value);
+        }
+        case 2: // Must be within range (min-max)
+        {
+            if (data.minValue[0] != '\0' && data.maxValue[0] != '\0')
+            {
+                float currentValue = StringToFloat(cvarValue);
+                float minVal = StringToFloat(data.minValue);
+                float maxVal = StringToFloat(data.maxValue);
+                
+                isViolation = (currentValue < minVal || currentValue > maxVal);
+            }
+        }
+        case 3: // Must be less than or equal
+        {
+            if (data.value[0] != '\0')
+            {
+                float currentValue = StringToFloat(cvarValue);
+                float maxVal = StringToFloat(data.value);
+                
+                isViolation = (currentValue > maxVal);
+            }
+        }
+        case 4: // Must be greater than or equal
+        {
+            if (data.value[0] != '\0')
+            {
+                float currentValue = StringToFloat(cvarValue);
+                float minVal = StringToFloat(data.value);
+                
+                isViolation = (currentValue < minVal);
+            }
+        }
+    }
     
     if (isViolation)
     {
@@ -225,11 +264,11 @@ void HandleViolation(int client, const char[] cvarName, const char[] cvarValue, 
     // Warn player
     if (remainingWarnings > 0)
     {
-        CPrintToChat(client, "%T", "Warn Client", client, cvarName, cvarValue, remainingWarnings);
+        CPrintToChat(client, "[DODSG] {red}Warning{default}: CVar {green}%s{default} is {red}%s{default}. Fix it or be kicked! ({yellow}%d{default} warnings left)", cvarName, cvarValue, remainingWarnings);
     }
     else if (remainingWarnings == 0)
     {
-        CPrintToChat(client, "%T", "Warn Client 2", client, cvarName, cvarValue, g_cvCheckTimer.FloatValue);
+        CPrintToChat(client, "[DODSG] {red}Final Warning{default}: CVar {green}%s{default} is {red}%s{default}. You will be punished in {yellow}%.0f{default} seconds!", cvarName, cvarValue, g_cvCheckTimer.FloatValue);
     }
     
     // Apply punishment if needed
@@ -247,15 +286,15 @@ void ApplyPunishment(int client, const char[] cvarName, const char[] cvarValue, 
     {
         case 1: // Kick
         {
-            Format(reason, sizeof(reason), "%T", "Kick Reason", client, cvarName, cvarValue);
+            Format(reason, sizeof(reason), "Invalid CVar: %s = %s", cvarName, cvarValue);
             KickClient(client, "%s", reason);
             LogAction(client, -1, "Client kicked for invalid cvar: %s = %s", cvarName, cvarValue);
         }
         case 2: // Ban
         {
-            Format(reason, sizeof(reason), "%T", "Ban Reason", client, cvarName, cvarValue);
+            Format(reason, sizeof(reason), "Invalid CVar: %s = %s", cvarName, cvarValue);
             char kickReason[512];
-            Format(kickReason, sizeof(kickReason), "%T", "Ban Kick Reason", client, cvarName, cvarValue);
+            Format(kickReason, sizeof(kickReason), "Banned for invalid CVar: %s = %s", cvarName, cvarValue);
             
             BanClient(client, data.banTime, BANFLAG_AUTO, reason, kickReason, "sm_dodsg");
             LogAction(client, -1, "Client banned for %d minutes for invalid cvar: %s = %s", data.banTime, cvarName, cvarValue);
@@ -267,7 +306,7 @@ void LogViolation(int client, const char[] cvarName, const char[] cvarValue)
 {
     char logPath[PLATFORM_MAX_PATH];
     BuildPath(Path_SM, logPath, sizeof(logPath), "logs/dodsg_cvar_checker.log");
-    LogToFile(logPath, "%L %T", client, "Log Warn", LANG_SERVER, cvarName, cvarValue);
+    LogToFile(logPath, "%L CVar violation detected: %s = %s", client, cvarName, cvarValue);
 }
 
 void NotifyAdmins(const char[] clientName, const char[] cvarName, const char[] cvarValue)
@@ -276,7 +315,7 @@ void NotifyAdmins(const char[] clientName, const char[] cvarName, const char[] c
     {
         if (IsValidClient(i) && IsAdmin(i))
         {
-            CPrintToChat(i, "%T", "Warn Admin", i, clientName, cvarName, cvarValue);
+            CPrintToChat(i, "[DODSG] {red}Alert{default}: Player {green}%s{default} has invalid CVar {yellow}%s{default} = {red}%s{default}", clientName, cvarName, cvarValue);
         }
     }
 }
@@ -286,11 +325,11 @@ void HandleQueryError(ConVarQueryResult result, const char[] cvarName)
     switch (result)
     {
         case ConVarQuery_NotFound:
-            LogError("CVar do cliente não encontrada: %s", cvarName);
+            LogError("Client CVar not found: %s", cvarName);
         case ConVarQuery_NotValid:
-            LogError("Comando de console encontrado mas não é uma CVar: %s", cvarName);
+            LogError("Console command found but not a CVar: %s", cvarName);
         case ConVarQuery_Protected:
-            LogError("CVar protegida, não é possível obter valor: %s", cvarName);
+            LogError("CVar is protected, cannot retrieve value: %s", cvarName);
     }
 }
 
@@ -332,8 +371,11 @@ public Action Command_Test(int client, int args)
         CvarData data;
         g_CvarList.GetArray(i, data);
         
-        PrintToConsole(client, "[%d] %s | Value: %s | Mode: %d | Punishment: %d | Ban: %dm | Immunity: %s",
-            i + 1, data.name, data.value, data.mode, data.punishment, data.banTime,
+        PrintToConsole(client, "[%d] %s | Value: %s | Min: %s | Max: %s | Mode: %d | Punishment: %d | Ban: %dm | Immunity: %s",
+            i + 1, data.name, data.value, 
+            data.minValue[0] ? data.minValue : "N/A",
+            data.maxValue[0] ? data.maxValue : "N/A",
+            data.mode, data.punishment, data.banTime,
             data.immunity[0] ? data.immunity : "None");
     }
     
