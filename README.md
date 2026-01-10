@@ -82,7 +82,7 @@ sm_dodsg_warn "5"      // Warnings before punishment (default: 5)
 sm_dodsg_check <name|#userid>  // Manually check player CVars
 ```
 **CVar Rules**
-Edit `addons/sourcemod/configs/dodsg_cvar_checker.cfg`:
+Check examples and edit you way @`addons/sourcemod/configs/dodsg_cvar_checker.cfg`:
 ```
 "cvar"
 {
@@ -103,7 +103,7 @@ Edit `addons/sourcemod/configs/dodsg_cvar_checker.cfg`:
 - Mode 4: Must be greater than or equal to value
 
 **Credits**
-- [Original plugin](https://forums.alliedmods.net/showthread.php?p=2529748) `sm_dod_ftb` by Kento
+- [Original plugin](https://forums.alliedmods.net/showthread.php?p=2529748) `Client-Convar-Checker` by Kento
 ---
 
 ## Requirements
