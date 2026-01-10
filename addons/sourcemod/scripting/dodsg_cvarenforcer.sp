@@ -23,7 +23,7 @@
  * 
  * ConVars:
  *   sm_dodsg_timer     - CVar check interval in seconds (default: 10.0)
- *   sm_dodsg_warn      - Number of warnings before punishment (default: 3)
+ *   sm_dodsg_warn      - Number of warnings before punishment (default: 5)
  * 
  * Configuration:
  *   File: addons/sourcemod/configs/dodsg_cvar_checker.cfg
