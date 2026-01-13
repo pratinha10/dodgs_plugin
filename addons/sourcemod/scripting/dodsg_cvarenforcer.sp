@@ -55,6 +55,7 @@ enum struct CvarData
 // Global variables
 ArrayList g_CvarList;
 int g_iPlayerWarnings[MAXPLAYERS + 1];
+bool g_bPlayerJustJoined[MAXPLAYERS + 1];
 Handle g_hCheckTimer;
 
 // ConVars
@@ -306,13 +307,34 @@ public void OnCvarQueried(QueryCookie cookie, int client, ConVarQueryResult resu
 
 void HandleViolation(int client, const char[] cvarName, const char[] cvarValue, CvarData data)
 {
+    char clientName[MAX_NAME_LENGTH];
+    GetClientName(client, clientName, sizeof(clientName));
+    
+    // If player just joined with wrong values, kick immediately without warnings
+    if (g_bPlayerJustJoined[client])
+    {
+        PrintToServer("[DODSG] Player %N joined with invalid CVar %s = %s - IMMEDIATE KICK", client, cvarName, cvarValue);
+        
+        // Notify everyone
+        for (int i = 1; i <= MaxClients; i++)
+        {
+            if (IsValidClient(i))
+            {
+                PrintToChat(i, "\x07FF0000[DODSG]\x01 \x05%s\x01 was kicked for joining with invalid CVar \x04%s\x01 = \x03%s\x01", 
+                    clientName, cvarName, cvarValue);
+            }
+        }
+        
+        // Apply immediate punishment
+        ApplyPunishment(client, cvarName, cvarValue, data);
+        return;
+    }
+    
+    // Normal warning system for players already in server
     g_iPlayerWarnings[client]++;
     
     int maxWarnings = g_cvMaxWarnings.IntValue;
     int remainingWarnings = maxWarnings - g_iPlayerWarnings[client];
-    
-    char clientName[MAX_NAME_LENGTH];
-    GetClientName(client, clientName, sizeof(clientName));
     
     // Warn player privately
     if (remainingWarnings > 0)
@@ -397,6 +419,7 @@ void HandleQueryError(ConVarQueryResult result, const char[] cvarName)
 public void OnClientPutInServer(int client)
 {
     g_iPlayerWarnings[client] = 0;
+    g_bPlayerJustJoined[client] = true;
     
     // Check CVars immediately when player joins (after a small delay to let them fully connect)
     if (IsValidClient(client))
@@ -414,6 +437,10 @@ public Action Timer_CheckNewPlayer(Handle timer, int userid)
         PrintToServer("[DODSG] Checking CVars for newly connected player: %N", client);
         PrintToServer("[DODSG] Client index: %d, IsInGame: %d, IsFakeClient: %d", client, IsClientInGame(client), IsFakeClient(client));
         CheckClientCvars(client);
+        
+        // Clear the flag immediately after first check
+        // This ensures only the INITIAL join check kicks immediately
+        CreateTimer(1.0, Timer_ClearJoinedFlag, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
     }
     else
     {
@@ -423,9 +450,23 @@ public Action Timer_CheckNewPlayer(Handle timer, int userid)
     return Plugin_Stop;
 }
 
+public Action Timer_ClearJoinedFlag(Handle timer, int userid)
+{
+    int client = GetClientOfUserId(userid);
+    
+    if (client && IsValidClient(client))
+    {
+        g_bPlayerJustJoined[client] = false;
+        PrintToServer("[DODSG] Player %N is now past initial grace period - warnings will apply", client);
+    }
+    
+    return Plugin_Stop;
+}
+
 public void OnClientDisconnect(int client)
 {
     g_iPlayerWarnings[client] = 0;
+    g_bPlayerJustJoined[client] = false;
 }
 
 public void OnConVarChanged(ConVar convar, const char[] oldValue, const char[] newValue)
